@@ -18,11 +18,12 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
-    await client.connect();
+  
     const database = client.db("bistroDB")
     const menuCollection = database.collection("allMenu")
     const reviewCollection = database.collection("reviews")
     const cartCollection = database.collection("carts")
+    const userCollection = database.collection("users")
     app.get('/allMenu' , async(req ,res) => {
         const cursor = menuCollection.find()
         const result =await cursor.toArray()
@@ -38,11 +39,7 @@ async function run() {
      const result = await cartCollection.insertOne(cart)
      res.send(result)
    })
-  //  app.get('/carts' , async(req , res) => {
-  //   const cursor = cartCollection.find()
-  //   const result = await cursor.toArray()
-  //   res.send(result)
-  //  })
+   
    app.get('/carts' , async(req, res) => {
      const email = req.query.email
      const query = {email: email}
@@ -55,10 +52,26 @@ async function run() {
      const result  =await cartCollection.deleteOne(query)
      res.send(result)
    })
+   app.post('/users' , async(req , res) => {
+    const newUser = req.body
+    const user = req.query
+    const query = {email: user?.email}
+    console.log(query)
+    const isExisted  =await userCollection.findOne(query)
+    if(isExisted){
+      return res.send({massage:"No second time insert in database"})
+    }
+    const result = await userCollection.insertOne(newUser)
+ return res.send(result)
+  })
+  app.get('/users' , async(req ,res) => {
+    const cursor = userCollection.find()
+    const result = await cursor.toArray()
+    res.send(result)
+})
    
    
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+   
     
   } finally {
     
