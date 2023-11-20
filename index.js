@@ -6,6 +6,7 @@ const cors = require("cors")
 const jwt = require("jsonwebtoken")
 app.use(cors())
 app.use(express.json())
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY)
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.hxdwxas.mongodb.net/?retryWrites=true&w=majority`
 
@@ -22,6 +23,7 @@ const verifyToken = (req , res ,next) => {
   return res.status(401).send({message : "Unauthorized Access"})
   }
  const token = req.headers.authorization.split(' ')[1]
+ console.log("verify token is" , token)
  jwt.verify(token , process.env.TOKEN_SECRET , (err , decoded) => {
   if(err){
     return res.status(401).send({message : "Unauthorized Access"})
@@ -45,16 +47,91 @@ async function run() {
         const result =await cursor.toArray()
         res.send(result)
     })
+    app.get('/menu/:id' , async(req ,res) => {
+      const id = req.params.id
+      const query = {_id : id}
+     
+      const result = await menuCollection.findOne(query);
+      res.send(result);
+    
+        
+    })
+   
     app.post('/menu' , async(req ,res) => {
       const menu  = req.body
       const result =await menuCollection.insertOne(menu)
       res.send(result)
     })
+
+
+    app.post("/create-payment-intent", async (req, res) => {
+      const { price } = req.body;
+      const amount = parseInt(price*100)
+    
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: "usd",
+        payment_method_types :['card']
+      });
+    
+      res.send({
+        clientSecret: paymentIntent.client_secret,
+      })
+    });
+
+    
+    app.patch('/menu/:id', async (req, res) => {
+      try {
+        const item = req.body;
+        const id = req.params.id;
+        const filter = { _id: id };
+    
+        const updatedDoc = {
+          $set: {}
+        };
+    
+        if (item.name) {
+          updatedDoc.$set.name = item.name;
+        }
+    
+        if (item.category) {
+          updatedDoc.$set.category = item.category;
+        }
+    
+        if (item.price) {
+          updatedDoc.$set.price = item.price;
+        }
+    
+        if (item.recipe) {
+          updatedDoc.$set.recipe = item.recipe;
+        }
+    
+        if (item.image) {
+          updatedDoc.$set.image = item.image;
+        }
+    
+        const result = await menuCollection.updateOne(filter, updatedDoc);
+    
+        res.send(result);
+      } catch (error) {
+        console.error(error);
+        res.status(500).send({ error: 'Internal Server Error' });
+      }
+    });
+
+    app.delete('/menu/:id' , async(req, res) => {
+      const id = req.params.id
+      const query = {_id :id}
+      const result  =await menuCollection.deleteOne(query)
+      res.send(result)
+    })
+
     app.get('/reviews' , async(req ,res) => {
         const cursor = reviewCollection.find()
         const result = await cursor.toArray()
         res.send(result)
     })
+
    app.post('/carts' , async(req , res) => {
      const cart = req.body
      const result = await cartCollection.insertOne(cart)
@@ -92,7 +169,9 @@ async function run() {
 })
 app.get('/user/admin/:email' ,verifyToken, async(req, res) => {
    const email = req.params.email
+   console.log(req.decoded)
    if(email !== req.decoded?.email){
+    
      return res.status(403).send("forbidden")
    }
    const query = {email : email}
@@ -104,13 +183,13 @@ app.get('/user/admin/:email' ,verifyToken, async(req, res) => {
    res.send({admin})
 })
 
-
 app.delete('/user/:id' , async(req, res) => {
   const id = req.params.id
   const query = {_id : new ObjectId(id)}
   const result  =await userCollection.deleteOne(query)
   res.send(result)
 })
+
 app.patch('/user/admin/:id' , async(req, res) => {
   const id = req.params.id
   const filter = {_id : new ObjectId(id)}
@@ -131,8 +210,7 @@ app.post('/jwt' , async(req , res) => {
   res.send({token})
 })
    
-   
-   
+   console.log("db connected")   
     
   } finally {
     
