@@ -42,6 +42,7 @@ async function run() {
     const reviewCollection = database.collection("reviews")
     const cartCollection = database.collection("carts")
     const userCollection = database.collection("users")
+    const paymentCollection = database.collection("payments")
     app.get('/allMenu' , async(req ,res) => {
         const cursor = menuCollection.find()
         const result =await cursor.toArray()
@@ -67,6 +68,7 @@ async function run() {
     app.post("/create-payment-intent", async (req, res) => {
       const { price } = req.body;
       const amount = parseInt(price*100)
+      console.log(amount)
     
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
@@ -188,6 +190,22 @@ app.delete('/user/:id' , async(req, res) => {
   const query = {_id : new ObjectId(id)}
   const result  =await userCollection.deleteOne(query)
   res.send(result)
+})
+app.get('/payments/:email',verifyToken, async(req ,res) => {
+  const cursor = paymentCollection.find()
+  const result = await cursor.toArray()
+  res.send(result)
+})
+app.post('/payments' , async(req , res) => {
+  const payment = req.body
+  const paymentResult =await paymentCollection.insertOne(payment)
+  const query = {
+    _id: {
+      $in:payment?.cartIds?.map(id => new ObjectId(id))
+    }
+  }
+  const deleteResult = await cartCollection.deleteMany(query)
+  res.send({paymentResult , deleteResult})
 })
 
 app.patch('/user/admin/:id' , async(req, res) => {
